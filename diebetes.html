@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vidhyut's Insulin App</title>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            color: #007bff;
+        }
+        section {
+            margin: 20px auto;
+            padding: 20px;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        #rebolus, #rebasal {
+            font-size: 1.2rem;
+            color: #007bff;
+        }
+        #insulinChart {
+            width: 100%;
+            max-width: 700px;
+            margin: auto;
+        }
+        .form-control {
+            margin-bottom: 15px;
+        }
+        #deleteAll {
+            background-color: #dc3545;
+            color: #fff;
+            border: none;
+        }
+        #deleteAll:hover {
+            background-color: #c82333;
+        }
+        .danger-section {
+            text-align: center;
+            color: #dc3545;
+        }
+        nav {
+            background-color: #007bff;
+            padding: 10px;
+        }
+        nav a {
+            color: white;
+            margin: 0 15px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body onload="startUp()">
+
+    <nav>
+        <a href="#insulinRecord">Insulin Record</a>
+        <a href="#personalizeProfile">Profile</a>
+        <a href="#insulinInfo">Info</a>
+        <a href="#dangerArea">Danger Zone</a>
+    </nav>
+
+    <h1>Vidhyut's Diabetes App</h1>
+
+    <section id="insulinRecord">
+        <h2>Insulin Record</h2>
+        <div class="mb-3">
+            <input type="number" id="insulinno" class="form-control" placeholder="Enter amount of insulin">
+            <input type="datetime-local" id="insulintime" class="form-control">
+        </div>
+        <button class="btn btn-primary" onclick="submitInsulin()">Submit</button>
+        <canvas id="insulinChart" class="mt-4"></canvas>
+    </section>
+
+    <section id="personalizeProfile">
+        <h2>Personalize Your Profile</h2>
+        <div class="mb-3">
+            <input type="number" id="bodyweight" class="form-control" placeholder="Body Weight (kg)">
+            <input type="number" id="age123" class="form-control" placeholder="Age">
+            <input type="number" id="dosedBasal" class="form-control" placeholder="Basal Dose (optional)">
+        </div>
+        <button class="btn btn-success" onclick="submitData()">Submit</button>
+    </section>
+
+    <section id="insulinInfo">
+        <h2>Insulin Information</h2>
+        <p><b>Bolus Left: </b><span id="rebolus">Set up your profile first!</span></p>
+        <p><b>Basal Left: </b><span id="rebasal">Set up your profile first!</span></p>
+    </section>
+
+    <section id="dangerArea" class="danger-section">
+        <h2>DANGER AREA</h2>
+        <p>Be careful with this section!</p>
+        <button id="deleteAll" class="btn" onclick="deleteAllData()">Delete All Data</button>
+    </section>
+
+    <script>
+        let chartInstance = null;
+
+        function submitData() {
+            const weight = parseFloat(document.getElementById("bodyweight").value);
+            const age = parseInt(document.getElementById("age123").value, 10);
+            const basalDose = parseFloat(document.getElementById("dosedBasal").value);
+
+            if (!weight || !age) {
+                swal("Error!", "Please fill in all required fields.", "error");
+                return;
+            }
+
+            const totalInsulin = Math.round(weight * 1.5);
+            let bolus, basal;
+
+            if (!basalDose) {
+                bolus = Math.round((totalInsulin / 10) * 6);
+                basal = Math.round((totalInsulin / 10) * 4);
+            } else {
+                bolus = totalInsulin - basalDose;
+                basal = basalDose;
+            }
+
+            localStorage.setItem("totalAllowedBolus", bolus);
+            localStorage.setItem("totalAllowedBasal", basal);
+
+            document.getElementById("rebolus").textContent = bolus;
+            document.getElementById("rebasal").textContent = basal;
+
+            swal("Success!", "Profile updated successfully.", "success");
+        }
+
+        function deleteAllData() {
+            swal("Warning!", "All data will be deleted!", "warning");
+            localStorage.clear();
+            document.getElementById("rebolus").textContent = "Set up your profile first!";
+            document.getElementById("rebasal").textContent = "Set up your profile first!";
+            location.reload();
+        }
+
+        function submitInsulin() {
+            const insulinAmount = parseFloat(document.getElementById("insulinno").value);
+            const insulinTime = document.getElementById("insulintime").value;
+
+            if (!insulinAmount || !insulinTime) {
+                swal("Error!", "Please fill in both fields.", "error");
+                return;
+            }
+
+            let bolus = parseFloat(localStorage.getItem("totalAllowedBolus")) || 0;
+            bolus -= insulinAmount;
+            localStorage.setItem("totalAllowedBolus", bolus);
+
+            let logs = JSON.parse(localStorage.getItem("insulinLogs")) || [];
+            logs.push({ time: insulinTime, amount: insulinAmount });
+            localStorage.setItem("insulinLogs", JSON.stringify(logs));
+
+            document.getElementById("rebolus").textContent = bolus;
+
+            swal("Success!", "Insulin data logged successfully.", "success");
+
+            generateInsulinGraph();
+        }
+
+        function generateInsulinGraph() {
+            const logs = JSON.parse(localStorage.getItem("insulinLogs")) || [];
+            const labels = logs.map(log => new Date(log.time).toLocaleString());
+            const data = logs.map(log => log.amount);
+
+            const ctx = document.getElementById('insulinChart').getContext('2d');
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Insulin Amount',
+                        data: data,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { title: { display: true, text: 'Insulin Amount' }, beginAtZero: true },
+                    },
+                }
+            });
+        }
+
+        function startUp() {
+            const bolus = localStorage.getItem("totalAllowedBolus");
+            const basal = localStorage.getItem("totalAllowedBasal");
+
+            if (bolus && basal) {
+                document.getElementById("rebolus").textContent = bolus;
+                document.getElementById("rebasal").textContent = basal;
+            } else {
+                swal("Welcome!", "Set up your profile to get started.", "info");
+            }
+
+            generateInsulinGraph();
+        }
+    </script>
+</body>
+</html>
